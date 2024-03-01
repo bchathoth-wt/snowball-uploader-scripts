@@ -73,7 +73,7 @@ function ZipDirectoryAndTransfer {
                     try {
                         # Use Command Prompt 'ren' command to rename the file ( using UNC path format)
                         # cmd /c ren "`"$($file.FullName)`"" "`"$sanitizedFileName`""  
-                        Rename-Item -Path "\\?\$($file.FullName)" -NewName $sanitizedFileName
+                        Rename-Item -LiteralPath "\\?\$($file.FullName)" -NewName $sanitizedFileName
                     }
                     catch {
                         <#Do this if a terminating exception happens#>
@@ -112,7 +112,7 @@ function ZipDirectoryAndTransfer {
         Write-Host ".... Number of zip files to be created: $numberOfZips "
         for ($i = 0; $i -lt $numberOfZips; $i++) {
             # Determine the range of files for the current zip
-            $fileBatch = $files | Select-Object -Skip ($i * $maxFilesPerZip) -First $maxFilesPerZip
+            # $fileBatch = $files | Select-Object -Skip ($i * $maxFilesPerZip) -First $maxFilesPerZip
 
             # Set the name for the zip file, including a batch number if there are multiple zips
             $zipFileName = if ($numberOfZips -gt 1) { "$sanitizedCurrentDirName`_part$($i+1).zip" } else { "$sanitizedCurrentDirName.zip" }
@@ -143,28 +143,20 @@ function ZipDirectoryAndTransfer {
             
             # Write the files names to the temp file in the batch to the temporary directory
             $destination = Join-Path -Path $tempDir -ChildPath "fileList.txt"
-            foreach ($file in $fileBatch) {
-                
-                # Copy-Item -Path $file.FullName -Destination $destination
-                $ErrorActionPreference = 'Stop'
-                try {
-                    # copy to temp folder the file ( using UNC path format)
-                    # Copy-Item -Path "\\?\$($file.FullName)" -Destination "\\?\$destination"
-                    # cmd /c copy "`"$($file.FullName)`"" "`"$destination`""
 
-                    # Writing the list of files to a text file
-                    "$($file.FullName)" | Out-File -FilePath $destination -Append -Encoding UTF8
-                }
-                catch {
-                    <#Do this if a terminating exception happens#>
-                    "$directoryPath" | Out-File -FilePath $failedFoldersFilePath -Append -Encoding UTF8
-                    Write-Host "Copy failed.  Error: $_"
-                    # Skip further processing of this folder and continue with the next one
-                    Write-Host "======================================================================================="
-                    return
-                } 
-                $ErrorActionPreference = 'Continue'
+            $ErrorActionPreference = 'Stop'
+            try {
+                # copy to temp folder the file ( using UNC path format)
+                $files | Select-Object -ExpandProperty FullName -Skip ($i * $maxFilesPerZip) -First $maxFilesPerZip | Out-File -FilePath $destination -Append -Encoding UTF8
             }
+            catch {
+        
+                Write-Host "Create ListFile failed.  Error: $_"
+                # Skip further processing of this folder and continue with the next one
+                Write-Host "======================================================================================="
+               return
+            } 
+            $ErrorActionPreference = 'Continue'            
             
             Write-Host "Zip file path `"$zipFilePath`" ....."   
             # Use 7z to create a zip archive of the file batch directly, no need for a temporary directory
